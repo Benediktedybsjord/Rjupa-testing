@@ -8,10 +8,17 @@
     "scheme": "rjupaapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "no.rjupa.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Rjúpa trenger tilgang til kamera for å ta bilde av skiva."
+      }
     },
+
     "android": {
+      "package": "no.rjupa.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,12 +26,17 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "CAMERA"
+      ]
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
       [
@@ -40,9 +52,31 @@
         }
       ]
     ],
+
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "firebase": {
+        "apiKey": "${EXPO_PUBLIC_FIREBASE_API_KEY}",
+        "authDomain": "${EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN}",
+        "projectId": "${EXPO_PUBLIC_FIREBASE_PROJECT_ID}",
+        "storageBucket": "${EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET}",
+        "messagingSenderId": "${EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}",
+        "appId": "${EXPO_PUBLIC_FIREBASE_APP_ID}"
+      }
     }
   }
 }
