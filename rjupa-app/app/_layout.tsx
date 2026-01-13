@@ -1,12 +1,23 @@
-import { Stack } from "expo-router"; 
-import { StatusBar } from 'expo-status-bar'
-import "../global.css";
+import "react-native-gesture-handler";
+import React from "react";
+import { Drawer } from "expo-router/drawer";
+import RjupaHeader from "../src/components/RjupaHeader";
+import RjupaDrawerContent from "../src/components/RjupaDrawerContent";
+import { theme } from "../src/constants/theme";
 
-export default function Layout() {
+
+export default function RootLayout() {
   return (
-    <>
-    <StatusBar style="auto"/>
-    <Stack screenOptions={{ headerStyle: {backgroundColor: '#004aad'}, headerTintColor: '#fff', headerTitleStyle: {fontWeight: 'bold'} }}/>
-    </>
-  )
+    <Drawer
+      screenOptions={{
+        header: (props) => <RjupaHeader {...props} />,
+        drawerStyle: { backgroundColor: theme.colors.bg },
+      }}
+      drawerContent={(props) => <RjupaDrawerContent {...props} />}
+    >
+      <Drawer.Screen name="(tabs)" options={{ title: "Home" }} />
+      <Drawer.Screen name="purchases" options={{ title: "Kjøp" }} />
+      <Drawer.Screen name="settings" options={{ title: "Innstillinger" }} />
+    </Drawer>
+  );
 }
