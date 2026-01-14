@@ -19,7 +19,7 @@ export default function TabsLayout() {
         },
         tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: theme.colors.text,
-        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+        tabBarLabelStyle: { fontFamily: theme.fonts.body || theme.fonts.bodyFallback, fontSize: 12 },
       }}
     >
       <Tabs.Screen

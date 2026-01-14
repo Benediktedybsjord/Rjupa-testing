@@ -2,9 +2,6 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { theme } from "../../src/constants/theme";
 
-
-// EXAMPLE
-
 export default function HomeScreen() {
   return (
     <View style={styles.container}>
@@ -21,19 +18,40 @@ export default function HomeScreen() {
   );
 }
 
-// TODO: CSS in own file 
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.bg, padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.bg,
+    padding: 16,
+  },
   card: {
     borderWidth: 1,
     borderColor: theme.colors.cardBorder,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "#FBF8FF",
+    backgroundColor: theme.colors.bg, // mer konsistent enn lilla
   },
-  imagePlaceholder: { height: 180, backgroundColor: "#EDE7F6" },
-  title: { marginTop: 12, paddingHorizontal: 12, fontWeight: "800", color: theme.colors.text },
-  sub: { paddingHorizontal: 12, marginTop: 2, color: "#555" },
-  body: { paddingHorizontal: 12, paddingVertical: 12, color: "#555" },
+  imagePlaceholder: {
+    height: 180,
+    backgroundColor: theme.colors.sand, // mer konsistent enn lilla
+  },
+  title: {
+    marginTop: 12,
+    paddingHorizontal: 12,
+    fontFamily: theme.fonts.heading || theme.fonts.headingFallback,
+    fontSize: 18,
+    color: theme.colors.text,
+  },
+  sub: {
+    paddingHorizontal: 12,
+    marginTop: 2,
+    fontFamily: theme.fonts.body || theme.fonts.bodyFallback,
+    color: theme.colors.muted,
+  },
+  body: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontFamily: theme.fonts.body || theme.fonts.bodyFallback,
+    color: theme.colors.muted,
+  },
 });
