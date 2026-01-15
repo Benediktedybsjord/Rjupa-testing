@@ -14,6 +14,7 @@ export default function RootLayout() {
         screenOptions={{
           header: (props) => <RjupaHeader {...props} />,
           drawerStyle: { backgroundColor: theme.colors.bg },
+          drawerPosition: "right",
         }}
         drawerContent={(props) => <RjupaDrawerContent {...props} />}
       >

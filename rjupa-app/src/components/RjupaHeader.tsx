@@ -23,6 +23,7 @@ export default function RjupaHeader({ navigation }: DrawerHeaderProps) {
         accessibilityRole="button"
         accessibilityLabel="Åpne meny"
         style={styles.menuBtn}
+        
       >
         <Feather name="menu" size={22} color={theme.colors.icon} />
       </Pressable>
