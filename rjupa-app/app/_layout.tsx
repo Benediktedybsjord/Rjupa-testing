@@ -10,21 +10,25 @@ import RjupaHeader from "../src/components/RjupaHeader";
 import RjupaDrawerContent from "../src/components/RjupaDrawerContent";
 import { theme } from "../src/constants/theme";
 
+import { AnalysisProvider } from "../src/context/AnalysisContext";
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <Drawer
-        screenOptions={{
-          header: (props) => <RjupaHeader {...props} />,
-          drawerStyle: { backgroundColor: theme.colors.bg },
-          drawerPosition: "right",
-        }}
-        drawerContent={(props) => <RjupaDrawerContent {...props} />}
-      >
-        <Drawer.Screen name="(tabs)" options={{ title: "Home" }} />
-        <Drawer.Screen name="purchase" options={{ title: "Kjøp" }} />
-        <Drawer.Screen name="settings" options={{ title: "Innstillinger" }} />
-      </Drawer>
+      <AnalysisProvider>
+        <Drawer
+          screenOptions={{
+            header: (props) => <RjupaHeader {...props} />,
+            drawerStyle: { backgroundColor: theme.colors.bg },
+            drawerPosition: "right",
+          }}
+          drawerContent={(props) => <RjupaDrawerContent {...props} />}
+        >
+          <Drawer.Screen name="(tabs)" options={{ title: "Home" }} />
+          <Drawer.Screen name="purchase" options={{ title: "Kjøp" }} />
+          <Drawer.Screen name="settings" options={{ title: "Innstillinger" }} />
+        </Drawer>
+      </AnalysisProvider>
     </SafeAreaProvider>
   );
 }

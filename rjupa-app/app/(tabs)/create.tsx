@@ -6,6 +6,10 @@ import * as ImagePicker from "expo-image-picker";
 
 import SelectImageModal from "../../src/components/SelectImageModal";
 
+
+// Skal vi ha kjøp analyser her også? Tenkte at drawer bør uansett ha kjøp i menyen, 
+// men vi bør ha det på en av skjermene også. Enten create eller profile?
+
 export default function CreateScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);

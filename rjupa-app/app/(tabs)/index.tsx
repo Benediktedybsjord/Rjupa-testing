@@ -20,20 +20,18 @@ export default function HomeScreen() {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      // TODO: Replace with real refresh logic (e.g. read from local store: available analyses, history).
       await new Promise((resolve) => setTimeout(resolve, 400));
     } finally {
       setRefreshing(false);
     }
   }, [refreshing]);
 
-  // TODO: Connect “available analyses” from local storage later.
-  const availableAnalyses = useMemo(() => 0, []);
+  // Demo/placeholder
+  const availableAnalyses = useMemo(() => 12, []);
   const canStartNewAnalysis = availableAnalyses > 0;
 
   const handleNewAnalysis = useCallback(() => {
-    // Adjust route to match the actual flow (metadata → camera).
-    router.push("/create");
+    router.navigate("/(tabs)/create");
   }, []);
 
   const handlePurchase = useCallback(() => {
@@ -56,6 +54,15 @@ export default function HomeScreen() {
             accessibilityRole="image"
             accessibilityLabel="Rjúpa-testing logo"
           />
+        </View>
+
+        {/* Demo / placeholder notice */}
+        <View className="bg-bg px-4 py-2">
+          <View className="self-center rounded-full border border-card-border bg-bg px-3 py-1">
+            <Text className="font-body text-[11px] text-muted">
+              Demo / midlertidig innhold – hjemmesiden er under utforming
+            </Text>
+          </View>
         </View>
 
         {/* Divider */}
@@ -87,14 +94,11 @@ export default function HomeScreen() {
           <View className="mt-3 rounded-card border border-card-border bg-sand px-3 py-2">
             <Text className="font-body text-[13px] text-text">
               Tilgjengelige analyser:{" "}
-              <Text className="font-heading text-[13px] text-text">
-                {availableAnalyses}
-              </Text>
+              <Text className="font-heading text-[13px] text-text">12</Text>
             </Text>
+
             <Text className="mt-0.5 font-body text-[12px] text-muted">
-              {canStartNewAnalysis
-                ? "Du kan starte en ny analyse nå."
-                : "Kjøp analyser for å starte ny test."}
+              Du kan starte en ny analyse nå.
             </Text>
           </View>
 
@@ -105,17 +109,15 @@ export default function HomeScreen() {
             </Text>
 
             <View className="flex-row gap-2">
-              {!canStartNewAnalysis && (
-                <Pressable
-                  onPress={handlePurchase}
-                  className="rounded-card border border-card-border bg-bg px-3 py-2"
-                  accessibilityRole="button"
-                  accessibilityLabel="Kjøp analyser"
-                  hitSlop={10}
-                >
-                  <Text className="font-body text-[13px] text-text">Kjøp</Text>
-                </Pressable>
-              )}
+              <Pressable
+                onPress={handlePurchase}
+                className="rounded-card border border-card-border bg-bg px-3 py-2"
+                accessibilityRole="button"
+                accessibilityLabel="Kjøp analyser"
+                hitSlop={10}
+              >
+                <Text className="font-body text-[13px] text-text">Kjøp</Text>
+              </Pressable>
 
               <Pressable
                 onPress={handleNewAnalysis}
