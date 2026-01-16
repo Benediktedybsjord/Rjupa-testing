@@ -1,23 +1,20 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   Alert,
   ActivityIndicator,
-  StyleSheet,
-  Pressable,
-  Platform,
   Modal,
+  StyleSheet,
   StatusBar,
+  Platform,
+  Linking,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Feather } from "@expo/vector-icons";
-
-// Later on we should use react-native-vision-camera instead of expo!
-// react-native-vision-camera (best in RN — true camera control, tap-to-focus, FPS control, etc.).
-// But it requires a dev build + native configuration (not Expo Go), and a bit more setup.
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
@@ -27,68 +24,164 @@ type Props = {
 
 type FocusPoint = { x: number; y: number } | null;
 
+/**
+ * Flow B:
+ * CAPTURE (this modal) -> REVIEW (/review) -> CONFIRM (outside via draft state)
+ *
+ * This modal should stay "dumb": it only returns a URI and closes.
+ * Navigation decisions happen in the caller.
+ */
 export default function SelectImageModal({
   visible,
   onClose,
   onImageSelected,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView | null>(null);
 
-  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
-  const [torchOn, setTorchOn] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+  const [isPicking, setIsPicking] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const [focusPoint, setFocusPoint] = useState<FocusPoint>(null);
 
-  // Request permission when modal opens
+  const busy = isTakingPhoto || isPicking;
+
+  // Reset volatile state when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setTorchOn(false);
+      setIsTakingPhoto(false);
+      setIsPicking(false);
+      setFocusPoint(null);
+    }
+  }, [visible]);
+
+  // Auto-request camera permission on open (only if undetermined)
   useEffect(() => {
     if (!visible) return;
     if (!permission) return;
+
     if (permission.status === "undetermined" && permission.canAskAgain) {
       requestPermission();
     }
   }, [visible, permission, requestPermission]);
 
+  // Auto-hide focus ring
   useEffect(() => {
     if (!focusPoint) return;
     const t = setTimeout(() => setFocusPoint(null), 900);
     return () => clearTimeout(t);
   }, [focusPoint]);
 
-  const pickImageFromLibrary = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      quality: 1,
-    });
+  const openAppSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      Alert.alert(
+        "Innstillinger",
+        "Kunne ikke åpne innstillinger på denne enheten."
+      );
+    }
+  }, []);
 
-    if (!result.canceled) onImageSelected(result.assets[0].uri);
-  };
+  const ensureLibraryPermission = useCallback(async () => {
+    const res = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!res.granted) {
+      Alert.alert(
+        "Bildetilgang kreves",
+        "Gi tilgang til bilder for å velge et bilde fra galleriet."
+      );
+      return false;
+    }
+    return true;
+  }, []);
 
-  const takePhoto = async () => {
-    if (isTakingPhoto) return;
+  const finalizeSelection = useCallback(
+    (uri: string) => {
+      // Close first to avoid a "flash" / modal lingering during navigation.
+      onClose();
+      onImageSelected(uri);
+    },
+    [onClose, onImageSelected]
+  );
+
+  const pickImageFromLibrary = useCallback(async () => {
+    if (busy) return;
+
+    const ok = await ensureLibraryPermission();
+    if (!ok) return;
+
+    try {
+      setIsPicking(true);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      if (result.canceled) return;
+
+      const uri = result.assets[0]?.uri;
+      if (!uri) {
+        Alert.alert("Feil", "Kunne ikke lese bildeadresse fra galleriet.");
+        return;
+      }
+
+      finalizeSelection(uri);
+    } catch {
+      Alert.alert("Feil", "Kunne ikke åpne galleriet. Prøv igjen.");
+    } finally {
+      setIsPicking(false);
+    }
+  }, [busy, ensureLibraryPermission, finalizeSelection]);
+
+  const takePhoto = useCallback(async () => {
+    if (busy) return;
+
+    if (!permission?.granted) {
+      Alert.alert(
+        "Kameratilgang kreves",
+        "Gi tilgang til kamera for å ta et bilde."
+      );
+      return;
+    }
+
+    if (!cameraRef.current) {
+      Alert.alert("Kamera ikke klart", "Vent litt og prøv igjen.");
+      return;
+    }
 
     try {
       setIsTakingPhoto(true);
-
-      if (!cameraRef.current) {
-        Alert.alert("Camera error", "Camera is not ready yet.");
-        return;
-      }
 
       const photo = await cameraRef.current.takePictureAsync({
         quality: 1,
         skipProcessing: false,
       });
 
-      if (photo?.uri) onImageSelected(photo.uri);
+      const uri = photo?.uri;
+      if (!uri) {
+        Alert.alert("Feil", "Ingen bildeadresse ble returnert.");
+        return;
+      }
+
+      finalizeSelection(uri);
     } catch {
-      Alert.alert("Error", "Could not take photo. Please try again.");
+      Alert.alert("Feil", "Kunne ikke ta bilde. Prøv igjen.");
     } finally {
       setIsTakingPhoto(false);
     }
-  };
+  }, [busy, permission?.granted, finalizeSelection]);
 
-  const bottomPad = 50; 
+  const padBottom = Math.max(insets.bottom, 12);
+  const padTop = Math.max(insets.top, Platform.OS === "android" ? 12 : 0);
+
+  const hasPermission = !!permission?.granted;
+  const canAskAgain = !!permission?.canAskAgain;
+  const showPermissionScreen = !!permission && !permission.granted;
 
   return (
     <Modal
@@ -106,66 +199,110 @@ export default function SelectImageModal({
           backgroundColor="transparent"
         />
 
+        {/* Loading */}
         {!permission ? (
           <View className="flex-1 items-center justify-center bg-black">
             <ActivityIndicator />
-            <Text className="mt-3 text-white/80">Laster kamera…</Text>
+            <Text className="mt-3 font-body text-white/80">Laster kamera…</Text>
           </View>
-        ) : !permission.granted ? (
+        ) : showPermissionScreen ? (
+          /* Permission screen */
           <View className="flex-1 items-center justify-center bg-black px-6">
-            <Text className="text-center text-white text-lg font-semibold">
-              Kamera-tilgang kreves
+            <Text className="text-center font-heading text-[18px] text-white">
+              Kameratilgang kreves
             </Text>
-            <Text className="mt-2 text-center text-white/70">
-              Gi tilgang for å kunne ta bilde.
+            <Text className="mt-2 text-center font-body text-white/70">
+              Vi trenger tilgang til kamera for å ta bilde av skiva.
             </Text>
 
-            <View className="mt-5 w-full flex-row gap-3">
-              <TouchableOpacity
-                onPress={requestPermission}
-                className="flex-1 items-center justify-center rounded-[14px] bg-sand/90 py-3"
-              >
-                <Text className="font-bold text-text">Gi tilgang</Text>
-              </TouchableOpacity>
+            <View className="mt-5 w-full gap-3">
+              {canAskAgain ? (
+                <Pressable
+                  onPress={requestPermission}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Gi kameratilgang"
+                >
+                  {({ pressed }) => (
+                    <View
+                      className={`items-center justify-center rounded-[14px] bg-sand/90 py-3 ${
+                        busy ? "opacity-60" : ""
+                      }`}
+                      style={{ opacity: pressed ? 0.9 : 1 }}
+                    >
+                      <Text className="font-body font-semibold text-text">
+                        Gi tilgang
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={openAppSettings}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Åpne innstillinger"
+                >
+                  {({ pressed }) => (
+                    <View
+                      className={`items-center justify-center rounded-[14px] bg-sand/90 py-3 ${
+                        busy ? "opacity-60" : ""
+                      }`}
+                      style={{ opacity: pressed ? 0.9 : 1 }}
+                    >
+                      <Text className="font-body font-semibold text-text">
+                        Åpne innstillinger
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              )}
 
-              <TouchableOpacity
+              <Pressable
                 onPress={onClose}
-                className="flex-1 items-center justify-center rounded-[14px] border border-white/20 bg-black/30 py-3"
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Lukk"
               >
-                <Text className="font-bold text-white">Lukk</Text>
-              </TouchableOpacity>
+                {({ pressed }) => (
+                  <View
+                    className={`items-center justify-center rounded-[14px] border border-white/20 bg-black/30 py-3 ${
+                      busy ? "opacity-60" : ""
+                    }`}
+                    style={{ opacity: pressed ? 0.9 : 1 }}
+                  >
+                    <Text className="font-body font-semibold text-white">
+                      Lukk
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
             </View>
           </View>
         ) : (
+          /* CAPTURE MODE (Review happens outside this modal in Flow B) */
           <>
-            {/* Tap overlay over preview */}
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={(e) => {
                 const { locationX, locationY } = e.nativeEvent;
                 setFocusPoint({ x: locationX, y: locationY });
-                // expo-camera in Expo Go doesn't expose a public focus API — UI indicator only
+                // NOTE: expo-camera (managed) doesn't expose manual focus control.
+                // This is a UI-only focus indicator.
               }}
+              accessibilityRole="image"
+              accessibilityLabel="Kameraforhåndsvisning"
             >
               <CameraView
                 ref={cameraRef}
                 facing="back"
-                active={visible}
+                active={visible && hasPermission}
                 enableTorch={torchOn}
                 autofocus={Platform.OS === "ios" ? "on" : undefined}
                 style={StyleSheet.absoluteFillObject}
               />
             </Pressable>
 
-            {/* Contrast overlay */}
-            <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                { backgroundColor: "rgba(0,0,0,0.10)" },
-              ]}
-            />
-
-            {/* Focus ring */}
             {focusPoint && (
               <View
                 pointerEvents="none"
@@ -178,78 +315,129 @@ export default function SelectImageModal({
                   borderRadius: 28,
                   borderWidth: 2,
                   borderColor: "rgba(255,255,255,0.85)",
-                  backgroundColor: "rgba(255,255,255,0.06)",
                 }}
-              >
-                <Text
-                  style={{
-                    position: "absolute",
-                    top: 60,
-                    left: -18,
-                    width: 92,
-                    textAlign: "center",
-                    fontSize: 12,
-                    color: "rgba(255,255,255,0.75)",
-                  }}
-                >
-                  Fokuserer…
-                </Text>
-              </View>
+              />
             )}
 
-            {/* Flashlight */}
-            <View className="absolute right-4 top-12">
-              <TouchableOpacity
+            <View
+              className="absolute left-0 right-0 flex-row items-center justify-between px-4"
+              style={{ paddingTop: padTop }}
+            >
+              <Pressable
+                onPress={onClose}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Lukk kamera"
+                hitSlop={10}
+              >
+                {({ pressed }) => (
+                  <View
+                    className={`h-11 w-11 items-center justify-center rounded-full bg-black/45 ${
+                      busy ? "opacity-60" : ""
+                    }`}
+                    style={{ opacity: pressed ? 0.85 : 1 }}
+                  >
+                    <Feather name="x" size={20} color="#fff" />
+                  </View>
+                )}
+              </Pressable>
+
+              <Pressable
                 onPress={() => setTorchOn((v) => !v)}
+                disabled={busy}
                 accessibilityRole="button"
                 accessibilityLabel={
                   torchOn ? "Skru av lommelykt" : "Skru på lommelykt"
                 }
-                className="h-11 w-11 items-center justify-center rounded-full bg-black/45"
+                hitSlop={10}
               >
-                <Feather
-                  name={torchOn ? "zap" : "zap-off"}
-                  size={20}
-                  color="#fff"
-                />
-              </TouchableOpacity>
+                {({ pressed }) => (
+                  <View
+                    className={`h-11 w-11 items-center justify-center rounded-full bg-black/45 ${
+                      busy ? "opacity-60" : ""
+                    }`}
+                    style={{ opacity: pressed ? 0.85 : 1 }}
+                  >
+                    <Feather
+                      name={torchOn ? "zap" : "zap-off"}
+                      size={20}
+                      color="#fff"
+                    />
+                  </View>
+                )}
+              </Pressable>
             </View>
 
-            {/* Bottom actions — flush to bottom */}
-            <View style={{ flex: 1, justifyContent: "flex-end" }}>
-              <View
-                className="w-full flex-row gap-2.5 px-4"
-                style={{ paddingBottom: bottomPad, paddingTop: 12 }}
-              >
-                <TouchableOpacity
+            <View
+              className="absolute left-0 right-0 px-4"
+              style={{ paddingBottom: padBottom, bottom: 0 }}
+            >
+              <View className="flex-row gap-2.5 py-3">
+                <Pressable
                   onPress={pickImageFromLibrary}
-                  className="flex-1 items-center justify-center rounded-[14px] border border-card-border bg-sand/90 py-3 shadow-lg active:opacity-80"
+                  disabled={busy}
+                  className="flex-1"
+                  accessibilityRole="button"
+                  accessibilityLabel="Velg fra galleri"
+                  hitSlop={10}
                 >
-                  <Text className="text-[15px] font-medium tracking-[0.2px] text-text">
-                    Velg
-                  </Text>
-                </TouchableOpacity>
+                  {({ pressed }) => (
+                    <View
+                      className={`items-center justify-center rounded-[14px] bg-sand/90 py-3 ${
+                        busy ? "opacity-60" : ""
+                      }`}
+                      style={{ opacity: pressed ? 0.9 : 1 }}
+                    >
+                      <Text className="font-body text-[15px] font-medium text-text">
+                        {isPicking ? "Åpner…" : "Velg"}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
 
-                <TouchableOpacity
+                <Pressable
                   onPress={takePhoto}
-                  disabled={isTakingPhoto}
-                  className={`flex-1 items-center justify-center rounded-[14px] border border-card-border bg-sand/90 py-3 shadow-lg active:opacity-80 ${
-                    isTakingPhoto ? "opacity-60" : ""
-                  }`}
+                  disabled={busy}
+                  className="flex-1"
+                  accessibilityRole="button"
+                  accessibilityLabel="Ta bilde"
+                  hitSlop={10}
                 >
-                  <Text className="text-[15px] font-medium tracking-[0.2px] text-text">
-                    {isTakingPhoto ? "..." : "Ta bilde"}
-                  </Text>
-                </TouchableOpacity>
+                  {({ pressed }) => (
+                    <View
+                      className={`items-center justify-center rounded-[14px] bg-sand/90 py-3 ${
+                        busy ? "opacity-60" : ""
+                      }`}
+                      style={{ opacity: pressed ? 0.9 : 1 }}
+                    >
+                      <Text className="font-body text-[15px] font-medium text-text">
+                        {isTakingPhoto ? "Tar bilde…" : "Ta bilde"}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
 
-                <TouchableOpacity
+                <Pressable
                   onPress={onClose}
-                  className="flex-1 items-center justify-center rounded-[14px] border border-card-border bg-sand/90 py-3 shadow-lg active:opacity-80"
+                  disabled={busy}
+                  className="flex-1"
+                  accessibilityRole="button"
+                  accessibilityLabel="Avbryt"
+                  hitSlop={10}
                 >
-                  <Text className="text-[15px] font-medium tracking-[0.2px] text-text">
-                    Avbryt
-                  </Text>
-                </TouchableOpacity>
+                  {({ pressed }) => (
+                    <View
+                      className={`items-center justify-center rounded-[14px] bg-sand/90 py-3 ${
+                        busy ? "opacity-60" : ""
+                      }`}
+                      style={{ opacity: pressed ? 0.9 : 1 }}
+                    >
+                      <Text className="font-body text-[15px] font-medium text-text">
+                        Avbryt
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
               </View>
             </View>
           </>
@@ -262,10 +450,6 @@ export default function SelectImageModal({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    minHeight: "100%",
     backgroundColor: "black",
-    paddingTop: 0,
-    paddingBottom: 0,
-    marginBottom: 0,
   },
 });

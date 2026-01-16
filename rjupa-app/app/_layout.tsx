@@ -27,6 +27,16 @@ export default function RootLayout() {
           <Drawer.Screen name="(tabs)" options={{ title: "Home" }} />
           <Drawer.Screen name="purchase" options={{ title: "Kjøp" }} />
           <Drawer.Screen name="settings" options={{ title: "Innstillinger" }} />
+
+          {/* Review route: part of navigation, but hidden from the drawer */}
+          <Drawer.Screen
+            name="review"
+            options={{
+              headerShown: false,
+              drawerItemStyle: { display: "none" },
+              swipeEnabled: false,
+            }}
+          />
         </Drawer>
       </AnalysisProvider>
     </SafeAreaProvider>

@@ -31,7 +31,7 @@ export default function HomeScreen() {
   const canStartNewAnalysis = availableAnalyses > 0;
 
   const handleNewAnalysis = useCallback(() => {
-    router.navigate("/(tabs)/create");
+    router.navigate("/(tabs)/newAnalysis");
   }, []);
 
   const handlePurchase = useCallback(() => {
