@@ -45,3 +45,11 @@ ios/
 
 # === Misc ===
 *.log
+
+# Firebase debug logs
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Node
+node_modules/
